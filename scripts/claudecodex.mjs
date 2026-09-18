@@ -40,7 +40,7 @@ const yellow = (s) => c('33', s);
 const red = (s) => c('31', s);
 
 let stepNo = 0;
-const step = (title) => console.log(`\n${bold(`[${++stepNo}/9] ${title}`)}`);
+const step = (title) => console.log(`\n${bold(`[${++stepNo}/10] ${title}`)}`);
 const ok = (msg) => console.log(`  ${green('✓')} ${msg}`);
 const warn = (msg) => console.log(`  ${yellow('!')} ${msg}`);
 const info = (msg) => console.log(`  ${dim(msg)}`);
@@ -718,6 +718,66 @@ start "" "${bat(app)}" --user-data-dir="${bat(PLAT.profile)}"
 }
 
 /**
+ * Refresh the Claude Code plugin from this checkout.
+ *
+ * Installing from a local directory COPIES the plugin into a version-keyed
+ * cache, and the version rarely changes during development — so Claude Code
+ * sees "already installed" and keeps serving an old copy. A slash command added
+ * since the last install is then simply absent, and restarting does not help,
+ * which is a genuinely confusing way to lose a command.
+ *
+ * `install.mjs` already uninstalls and clears the cache before reinstalling, so
+ * running it is the fix. It is skipped when the copies already match, to keep
+ * a re-run cheap.
+ */
+function stepPlugin() {
+  step('Claude Code plugin');
+
+  const source = path.join(ROOT, 'packages', 'plugin', 'commands');
+  const cacheRoot = path.join(os.homedir(), '.claude', 'plugins', 'cache', 'codex-bridge', 'codex-bridge');
+  const list = (dir) => {
+    try {
+      return fs.readdirSync(dir).sort().join(',');
+    } catch {
+      return null;
+    }
+  };
+
+  const want = list(source);
+  if (!want) {
+    warn('no plugin commands in this checkout');
+    return;
+  }
+
+  let installed = null;
+  try {
+    for (const version of fs.readdirSync(cacheRoot)) {
+      const got = list(path.join(cacheRoot, version, 'commands'));
+      if (got) installed = got;
+    }
+  } catch {
+    /* never installed */
+  }
+
+  if (installed === want) {
+    ok('up to date');
+    return;
+  }
+
+  const res = spawnSync(process.execPath, [path.join(ROOT, 'scripts', 'install.mjs'), '--no-build'], {
+    cwd: ROOT,
+    encoding: 'utf8',
+  });
+  if (res.status !== 0) {
+    warn('could not refresh the plugin');
+    info(`${res.stdout ?? ''}${res.stderr ?? ''}`.trim().split('\n').slice(-2).join('\n  '));
+    return;
+  }
+  ok(installed === null ? 'installed' : 'refreshed');
+  info('Slash commands load at startup — start a new Claude Code session to pick them up.');
+}
+
+/**
  * Last step: ask the bridge whether it still works.
  *
  * This exists for the long run rather than for today. Credentials expire, Codex
@@ -760,6 +820,7 @@ const app = stepProfile(gatewayUrl);
 await stepImportSessions();
 stepLaunch(app);
 await stepLauncher(app);
+stepPlugin();
 stepHealth();
 
 console.log(`\n${green(bold('Done.'))}\n`);
