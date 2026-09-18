@@ -1,0 +1,19 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": ["${CLAUDE_PLUGIN_ROOT}/bin/codex-bridge.cjs", "start", "--json"],
+            "timeout": 90,
+            "statusMessage": "Starting Codex Bridge…",
+            "async": true
+          }
+        ]
+      }
+    ]
+  }
+}

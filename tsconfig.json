@@ -1,0 +1,9 @@
+{
+  "files": [],
+  "references": [
+    { "path": "packages/shared" },
+    { "path": "packages/codex-client" },
+    { "path": "packages/gateway" },
+    { "path": "packages/cli" }
+  ]
+}

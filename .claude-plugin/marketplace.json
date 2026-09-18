@@ -1,0 +1,12 @@
+{
+  "name": "codex-bridge",
+  "owner": { "name": "Codex Bridge contributors" },
+  "description": "Route Claude Code through OpenAI Codex using your ChatGPT subscription.",
+  "plugins": [
+    {
+      "name": "codex-bridge",
+      "source": "./packages/plugin",
+      "description": "Connect Claude Code to OpenAI Codex over ChatGPT OAuth."
+    }
+  ]
+}

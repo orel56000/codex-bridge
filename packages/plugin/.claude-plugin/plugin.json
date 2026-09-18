@@ -1,0 +1,9 @@
+{
+  "name": "codex-bridge",
+  "displayName": "Codex Bridge",
+  "version": "0.1.0",
+  "description": "Use OpenAI Codex as the model behind Claude Code, over your existing ChatGPT subscription. No OpenAI API key.",
+  "author": { "name": "Codex Bridge contributors" },
+  "license": "MIT",
+  "keywords": ["codex", "openai", "chatgpt", "gateway", "model"]
+}

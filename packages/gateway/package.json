@@ -1,0 +1,13 @@
+{
+  "name": "@codex-bridge/gateway",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": { ".": "./dist/index.js" },
+  "dependencies": {
+    "@codex-bridge/shared": "0.1.0",
+    "@codex-bridge/codex-client": "0.1.0"
+  }
+}

@@ -1,0 +1,36 @@
+{
+  "name": "codex-bridge-monorepo",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Use OpenAI Codex as the backing model for Claude Code, over your existing ChatGPT subscription.",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=20.11.0"
+  },
+  "workspaces": [
+    "packages/shared",
+    "packages/codex-client",
+    "packages/gateway",
+    "packages/cli"
+  ],
+  "scripts": {
+    "build": "tsc --build",
+    "clean": "tsc --build --clean",
+    "rebuild": "npm run clean && npm run build",
+    "test": "npm run build && node --test \"packages/*/dist/**/*.test.js\"",
+    "typecheck": "tsc --build --dry",
+    "start": "node packages/cli/dist/bin.js start",
+    "doctor": "node packages/cli/dist/bin.js doctor",
+    "test:unit": "node --test \"packages/*/dist/**/*.test.js\"",
+    "test:e2e": "node scripts/e2e.mjs",
+    "install-plugin": "node scripts/install.mjs",
+    "uninstall-plugin": "node scripts/install.mjs --uninstall",
+    "protocol:check": "node scripts/check-protocol.mjs",
+    "claudecodex": "node scripts/claudecodex.mjs"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.2",
+    "@types/node": "^22.10.2"
+  }
+}

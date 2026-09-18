@@ -1,0 +1,13 @@
+{
+  "name": "@codex-bridge/cli",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/bin.js",
+  "bin": { "codex-bridge": "./dist/bin.js" },
+  "dependencies": {
+    "@codex-bridge/shared": "0.1.0",
+    "@codex-bridge/codex-client": "0.1.0",
+    "@codex-bridge/gateway": "0.1.0"
+  }
+}
