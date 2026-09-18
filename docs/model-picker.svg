@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="820" height="470" viewBox="0 0 820 470" role="img"
+     aria-label="One model picker listing four Claude models and five Codex models served by the same gateway">
+  <title>One picker, both plans</title>
+  <desc>The nine models the Codex Bridge gateway advertises: Claude Opus 5, Fable 5.1, Sonnet 5 and Haiku 4.5 forwarded to Anthropic, and Codex GPT-6-Astra, GPT-5.6-Sol, GPT-5.6-Terra, GPT-5.6-Luna and GPT-5.5 served over a ChatGPT subscription.</desc>
+
+  <defs>
+    <style>
+      .bg    { fill: #16161a; }
+      .card  { fill: #1e1e24; stroke: #2e2e37; }
+      .h1    { fill: #f2f2f5; font: 600 19px -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, sans-serif; }
+      .sub   { fill: #8d8d99; font: 400 13px -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, sans-serif; }
+      .group { fill: #8d8d99; font: 600 11px -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, sans-serif; letter-spacing: .09em; }
+      .name  { fill: #ececf1; font: 500 14.5px -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, sans-serif; }
+      .id    { fill: #6f6f7b; font: 400 12px ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace; }
+      .plan  { fill: #7d7d89; font: 400 11.5px -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, sans-serif; }
+      .rule  { stroke: #2a2a33; }
+    </style>
+  </defs>
+
+  <rect class="bg" width="820" height="470" rx="10"/>
+
+  <text class="h1" x="34" y="44">One picker, both plans</text>
+  <text class="sub" x="34" y="66">Claude Desktop, pointed at the Codex Bridge gateway on 127.0.0.1:4141</text>
+
+  <rect class="card" x="34" y="88" width="752" height="344" rx="9"/>
+
+  <!-- Claude -->
+  <text class="group" x="56" y="120">CLAUDE  ·  YOUR CLAUDE PLAN</text>
+
+  <text class="name" x="56" y="150">Claude Opus 5</text>
+  <text class="id"   x="430" y="150">claude-cbxo-5</text>
+  <text class="name" x="56" y="180">Claude Fable 5.1</text>
+  <text class="id"   x="430" y="180">claude-cbxf-5-1</text>
+  <text class="name" x="56" y="210">Claude Sonnet 5</text>
+  <text class="id"   x="430" y="210">claude-cbxs-5</text>
+  <text class="name" x="56" y="240">Claude Haiku 4.5</text>
+  <text class="id"   x="430" y="240">claude-cbxh-4-5-20251001</text>
+
+  <line class="rule" x1="56" y1="262" x2="764" y2="262"/>
+
+  <!-- Codex -->
+  <text class="group" x="56" y="292">CODEX  ·  YOUR CHATGPT SUBSCRIPTION</text>
+
+  <text class="name" x="56" y="322">Codex GPT-6-Astra</text>
+  <text class="id"   x="430" y="322">claude-bridge-6-astra</text>
+  <text class="name" x="56" y="348">Codex GPT-5.6-Sol</text>
+  <text class="id"   x="430" y="348">claude-bridge-5-6-sol</text>
+  <text class="name" x="56" y="374">Codex GPT-5.6-Terra</text>
+  <text class="id"   x="430" y="374">claude-bridge-5-6-terra</text>
+  <text class="name" x="56" y="400">Codex GPT-5.6-Luna</text>
+  <text class="id"   x="430" y="400">claude-bridge-5-6-luna</text>
+  <text class="name" x="56" y="426">Codex GPT-5.5</text>
+  <text class="id"   x="430" y="426">claude-bridge-5-5</text>
+
+  <text class="plan" x="34" y="456">Ids carry no vendor word on purpose — the desktop drops any model id containing “codex” or “gpt”.</text>
+</svg>

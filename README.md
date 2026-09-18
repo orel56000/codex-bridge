@@ -7,6 +7,14 @@ subscription. No OpenAI API key.
 Claude Code  →  local gateway (127.0.0.1)  →  Codex App Server  →  ChatGPT OAuth  →  Codex
 ```
 
+With an Anthropic credential the same gateway also serves your Claude models, so one
+Claude Desktop window offers both:
+
+<img src="docs/model-picker.svg" alt="A model picker listing Claude Opus 5, Fable 5.1, Sonnet 5 and Haiku 4.5 alongside Codex GPT-6-Astra, GPT-5.6-Sol, GPT-5.6-Terra, GPT-5.6-Luna and GPT-5.5" width="820">
+
+Pick a Claude model and the request is forwarded to Anthropic on your Claude plan; pick a
+Codex one and it is served over your ChatGPT subscription. No restart to switch.
+
 Authentication is handled entirely by the official `codex app-server`: the bridge never
 sees, stores, or refreshes an OAuth token.
 
