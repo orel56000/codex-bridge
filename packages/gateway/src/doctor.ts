@@ -4,6 +4,7 @@ import { codexInstallHint, detectClaudeCodeDesktop, findCodexBinary } from '@cod
 import type { CodexAppServerClient } from '@codex-bridge/codex-client';
 import type { ModelMapper } from './models.js';
 import { verifyAnthropicCredential } from './passthrough.js';
+import { predictProbeModel, probeDesktop } from './desktop.js';
 import type { BridgeStatus } from './status.js';
 
 /**
@@ -37,6 +38,8 @@ export async function runDoctor(opts: {
   client: CodexAppServerClient | null;
   models: ModelMapper | null;
   status: BridgeStatus | null;
+  /** Exactly what `/v1/models` is advertising right now, in order. */
+  advertisedIds?: string[];
 }): Promise<DoctorReport> {
   const checks: Check[] = [];
 
@@ -143,17 +146,6 @@ export async function runDoctor(opts: {
     checks.push({ name: 'Claude Code configuration', state: 'ok', detail: cc.baseUrl ?? '' });
   }
 
-  /* 6b. Claude Code Desktop */
-  const desktop = detectClaudeCodeDesktop();
-  if (desktop.installed) {
-    checks.push({
-      name: 'Claude Code Desktop',
-      state: 'warn',
-      detail: 'installed — the Code tab does not read ANTHROPIC_BASE_URL',
-      fix: 'In the desktop app: Help → Troubleshooting → Enable Developer Mode, then Developer → Configure Third-Party Inference, and point it at the gateway URL above. See docs/troubleshooting.md.',
-    });
-  }
-
   /* 7. Model availability */
   const models = opts.status?.model;
   if (!models || !models.available.length) {
@@ -169,6 +161,64 @@ export async function runDoctor(opts: {
       state: 'ok',
       detail: `${models.resolved ?? models.available[0]?.id} (${models.available.length} available)`,
     });
+  }
+
+  /* 7a. Does Claude Code Desktop still accept what we advertise?
+   *
+   * The desktop's rules are undocumented and version-specific, and every way
+   * they can break is silent — an empty picker, a permanent "Models are still
+   * loading", a health banner blaming the gateway for someone else's quota.
+   * So the rules are re-read from the installed app rather than assumed, and
+   * our own ids are tested against them. */
+  const desktopProbe = detectClaudeCodeDesktop().installed ? probeDesktop() : null;
+  if (desktopProbe?.installed) {
+    checks.push({
+      name: 'Claude Code Desktop',
+      state: 'ok',
+      detail: desktopProbe.version ? `v${desktopProbe.version}` : 'installed',
+    });
+
+    const ids = opts.advertisedIds ?? [];
+    if (!desktopProbe.idFilter) {
+      checks.push({
+        name: 'Desktop model filter',
+        state: 'warn',
+        detail: 'could not be read from the installed app',
+        fix: 'Claude Desktop changed shape. The model ids may no longer be accepted; if the picker is empty, that is why.',
+      });
+    } else if (!ids.length) {
+      checks.push({ name: 'Desktop model filter', state: 'unknown', detail: 'no models advertised yet' });
+    } else {
+      const rejected = ids.filter((id) => !desktopProbe.idFilter?.(id));
+      checks.push(
+        rejected.length === 0
+          ? { name: 'Desktop model filter', state: 'ok', detail: `all ${ids.length} ids accepted by this version` }
+          : {
+              name: 'Desktop model filter',
+              state: 'fail',
+              detail: `${rejected.length}/${ids.length} rejected: ${rejected.slice(0, 3).join(', ')}`,
+              fix: 'This Claude Desktop drops those ids, so they vanish from the picker with no error. The naming rules changed — see docs/protocol-mapping.md.',
+            },
+      );
+    }
+
+    // The desktop probes ONE model to decide the whole gateway is healthy, and
+    // does not special-case 429 — so a rate-limited Claude model makes the
+    // gateway itself look broken.
+    if (ids.length) {
+      const probed = predictProbeModel(ids);
+      const isCodex = probed !== null && /^claude-bridge/.test(probed);
+      checks.push({
+        name: 'Desktop health probe',
+        state: isCodex ? 'ok' : 'warn',
+        detail: `would test ${probed ?? 'nothing'}`,
+        ...(isCodex
+          ? {}
+          : {
+              fix: 'That is a passthrough to Anthropic, so its quota decides whether the gateway looks healthy. Set models.codexFirst to test a Codex model instead.',
+            }),
+      });
+    }
   }
 
   /* 7b. Claude models alongside Codex */
@@ -187,6 +237,18 @@ export async function runDoctor(opts: {
       state,
       detail: cred.detail,
       ...(cred.fix && state !== 'ok' ? { fix: cred.fix } : {}),
+    });
+  }
+
+  /* 7c. Is a model limit hiding something new? */
+  const limit = opts.config.models.codexLimit;
+  const available = opts.status?.model?.available?.length ?? 0;
+  if (limit !== null && available > limit) {
+    checks.push({
+      name: 'Codex model list',
+      state: 'warn',
+      detail: `${available} available, ${limit} advertised`,
+      fix: `Codex has released models you are not being offered. Raise models.codexLimit to ${available}, or set it to null for all of them.`,
     });
   }
 

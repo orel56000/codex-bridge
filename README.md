@@ -149,6 +149,42 @@ request, so a credential that does not work is reported as broken rather than as
 Until one works, Codex holds the opus/sonnet/haiku slots. Once one does, those
 slots go back to real Claude models.
 
+## Keeping it working
+
+Nothing here is a one-time setup. Re-run the installer and it re-checks everything and
+repairs what drifted:
+
+```bash
+npm run claudecodex
+```
+
+Its last step asks the bridge whether it still works, and `codex-bridge doctor` is the
+same check on its own. Four things expire or move, and each one fails **silently** — no
+error, just a model quietly missing or a picker that never fills:
+
+| What changes | How you find out | Fix |
+| --- | --- | --- |
+| The Claude token expires (they last a year) | `Claude models (passthrough)` fails, with Anthropic's own reason | re-run the installer; it re-mints and re-verifies |
+| ChatGPT sign-in lapses | `ChatGPT authentication` fails | re-run the installer |
+| Codex ships a new model | `Codex model list` warns `N available, M advertised` | raise `models.codexLimit`, or set it to `null` |
+| Anthropic ships a new Claude model | nothing to do — the newest of each family is picked by date | add the family to `models.claudeFamilies` if it is a new one |
+
+**A Claude Desktop update is the one to watch.** The model ids, the health probe and the
+profile layout are all shaped by client behaviour that is undocumented and version-specific
+— see [protocol mapping](docs/protocol-mapping.md). So the doctor does not assume any of it:
+it re-reads the rules out of the Claude Desktop that is actually installed and tests the ids
+the gateway is actually advertising against them.
+
+```
+✓ Claude Code Desktop          v2.2553.1
+✓ Desktop model filter         all 9 ids accepted by this version
+✓ Desktop health probe         would test claude-bridge-6-astra
+```
+
+If an update changes those rules, that turns into a named failure — which id was rejected,
+or which model the probe would wrongly test — instead of an empty picker you have to
+reverse-engineer from scratch.
+
 ## Honest limitations
 
 These are real and worth knowing before you install:

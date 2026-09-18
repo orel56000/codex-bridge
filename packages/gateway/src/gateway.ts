@@ -21,7 +21,13 @@ import { collectStatus, type BridgeStatus } from './status.js';
 import { managementPage } from './ui/page.js';
 import { readClaudeCodeConfig } from './claude-config.js';
 import { AnthropicPassthrough, isAnthropicModel } from './passthrough.js';
-import { isBridgeModelId, restoreTierWord, shortlistClaudeModels, stripDescriptions } from './models.js';
+import {
+  isBridgeModelId,
+  restoreTierWord,
+  shortlistClaudeModels,
+  stripDescriptions,
+  type ApiModelRow,
+} from './models.js';
 import { runDoctor } from './doctor.js';
 
 export interface GatewayOptions {
@@ -169,6 +175,33 @@ export class Gateway {
     await this.client.shutdown();
   }
 
+  /**
+   * Exactly what `/v1/models` advertises, in order.
+   *
+   * A method rather than inline in the route because the doctor checks these
+   * same ids against the installed Claude Desktop's rules. Computing them
+   * twice would let the check and the reality drift apart, which is the one
+   * thing a self-check must never do.
+   */
+  async advertisedModels(): Promise<Array<Record<string, unknown> | ApiModelRow>> {
+    await this.models.refresh();
+    const all = await this.passthrough.listModels();
+    let upstream = shortlistClaudeModels(all, this.config.models.claudeFamilies);
+    if (!this.config.models.descriptions) upstream = stripDescriptions(upstream);
+    // Real Claude models keep their own tiers; Codex only claims the tier
+    // defaults when it is the sole provider. Key that off what Anthropic
+    // actually returned, not off the shortlist — a shortlist that matched
+    // nothing must not silently hand the slots back to Codex.
+    const codex = this.models.listForApi({
+      claimTierDefaults: all.length === 0,
+      codexLimit: this.config.models.codexLimit,
+      descriptions: this.config.models.descriptions,
+    });
+    // Order is not cosmetic: the desktop probes the FIRST row and also uses it
+    // as the default model. See `models.codexFirst`.
+    return this.config.models.codexFirst ? [...codex, ...upstream] : [...upstream, ...codex];
+  }
+
   async status(): Promise<BridgeStatus> {
     return collectStatus({
       client: this.client,
@@ -251,27 +284,26 @@ export class Gateway {
     });
 
     this.http.route('GET', '/v1/models', async ({ res }) => {
-      await this.models.refresh();
-      const all = await this.passthrough.listModels();
-      let upstream = shortlistClaudeModels(all, this.config.models.claudeFamilies);
-      if (!this.config.models.descriptions) upstream = stripDescriptions(upstream);
-      // Real Claude models keep their own tiers; Codex only claims the tier
-      // defaults when it is the sole provider. Key that off what Anthropic
-      // actually returned, not off the shortlist — a shortlist that matched
-      // nothing must not silently hand the slots back to Codex.
-      const codex = this.models.listForApi({
-        claimTierDefaults: all.length === 0,
-        codexLimit: this.config.models.codexLimit,
-        descriptions: this.config.models.descriptions,
-      });
-      // Order is not cosmetic: the desktop probes the first row and uses it as
-      // the default model. See `models.codexFirst`.
       sendJson(res, 200, {
-        data: this.config.models.codexFirst ? [...codex, ...upstream] : [...upstream, ...codex],
+        data: await this.advertisedModels(),
         has_more: false,
         first_id: null,
         last_id: null,
       });
+    });
+
+    this.http.route('POST', '/admin/doctor', async ({ res }) => {
+      const report = await runDoctor({
+        config: this.config,
+        client: this.client,
+        models: this.models,
+        status: await this.status(),
+        // The doctor checks the ids we ACTUALLY advertise against the rules of
+        // the Claude Desktop that is actually installed, so an app update that
+        // changes those rules is reported rather than silently breaking things.
+        advertisedIds: (await this.advertisedModels().catch(() => [])).map((m) => String(m['id'])),
+      });
+      sendJson(res, 200, { report: report.text, ok: report.ok });
     });
 
     // Claude Code sends a HEAD probe here at startup. It is not a health gate;
@@ -305,16 +337,6 @@ export class Gateway {
 
     this.http.route('GET', '/admin/status', async ({ res }) => {
       sendJson(res, 200, await this.status());
-    });
-
-    this.http.route('POST', '/admin/doctor', async ({ res }) => {
-      const report = await runDoctor({
-        config: this.config,
-        client: this.client,
-        models: this.models,
-        status: await this.status(),
-      });
-      sendJson(res, 200, { report: report.text, ok: report.ok });
     });
 
     this.http.route('POST', '/admin/restart', async ({ res }) => {

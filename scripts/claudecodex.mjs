@@ -40,7 +40,7 @@ const yellow = (s) => c('33', s);
 const red = (s) => c('31', s);
 
 let stepNo = 0;
-const step = (title) => console.log(`\n${bold(`[${++stepNo}/8] ${title}`)}`);
+const step = (title) => console.log(`\n${bold(`[${++stepNo}/9] ${title}`)}`);
 const ok = (msg) => console.log(`  ${green('✓')} ${msg}`);
 const warn = (msg) => console.log(`  ${yellow('!')} ${msg}`);
 const info = (msg) => console.log(`  ${dim(msg)}`);
@@ -717,6 +717,35 @@ start "" "${bat(app)}" --user-data-dir="${bat(PLAT.profile)}"
   info('It is in your Start Menu as "Claude + Codex" — right-click to pin it.');
 }
 
+/**
+ * Last step: ask the bridge whether it still works.
+ *
+ * This exists for the long run rather than for today. Credentials expire, Codex
+ * ships models a limit then hides, and Claude Desktop updates can change the
+ * undocumented rules this whole integration is built on. Every one of those
+ * fails silently — an empty picker, a stale banner, a model quietly missing.
+ *
+ * The doctor re-derives those rules from the app that is actually installed,
+ * so re-running this script is a real check and not a reassuring no-op.
+ */
+function stepHealth() {
+  step('Check it still works');
+  const { code, out } = bridge(['doctor']);
+  const lines = out.trimEnd().split('\n');
+
+  const problems = lines.filter((l) => /^[✗!]/.test(l.trim()));
+  if (!problems.length) {
+    ok('everything checks out');
+  } else {
+    for (const line of lines.slice(1)) {
+      if (!line.trim()) continue;
+      if (/^\s*[✗!]/.test(line)) console.log(`  ${line.trim()}`);
+      else if (/^\s+→/.test(line)) console.log(`    ${dim(line.trim())}`);
+    }
+  }
+  if (code !== 0 && !problems.length) info(out.trimEnd().split('\n').slice(-1)[0]);
+}
+
 /* ---------------------------------- main ---------------------------------- */
 
 console.log(bold('\nClaude + Codex\n'));
@@ -731,7 +760,9 @@ const app = stepProfile(gatewayUrl);
 await stepImportSessions();
 stepLaunch(app);
 await stepLauncher(app);
+stepHealth();
 
 console.log(`\n${green(bold('Done.'))}\n`);
-console.log('  Re-run this any time — it checks everything and repairs what is missing:');
+console.log('  Re-run this any time — it checks everything and repairs what is missing.');
+console.log('  Worth re-running after a Claude Desktop update, or if models go missing:');
 console.log(dim('    npm run claudecodex\n'));
