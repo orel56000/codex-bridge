@@ -71,10 +71,21 @@ async function ask(question, fallback = true) {
  * Two rules come from the app itself, not from convention, and getting either
  * wrong means it silently ignores everything this script writes:
  *
- * 1. **The profile directory name must end in `-3p`.** The app derives its own
- *    path as `userData.endsWith('-3p') ? userData : userData + '-3p'`, so a
- *    directory named anything else is abandoned and a sibling `<dir>-3p` is
- *    used instead. `CLAUDE_3P_PROFILE` is corrected rather than obeyed.
+ * 1. **The profile directory name must end in `-3p`, and must NOT be the normal
+ *    profile's name plus `-3p`.** The app derives the directory it reads its
+ *    deployment config from as
+ *    `userData.endsWith('-3p') ? userData : userData + '-3p'`.
+ *
+ *    That single line causes both rules. A directory not ending in `-3p` is
+ *    abandoned for a sibling that does. And a bridge profile at `Claude-3p` is
+ *    exactly where the NORMAL instance (userData `Claude`) goes looking — so
+ *    it finds the gateway config, adopts it, and relocates itself into the
+ *    bridge profile. The two stop being separate instances, and because
+ *    `deploymentMode` lives in that same shared directory, turning one off
+ *    turns off the other.
+ *
+ *    Hence `ClaudeCodex-3p`: it ends in `-3p`, so the bridge keeps it, and it
+ *    is not `<normal userData>-3p`, so the normal instance never looks at it.
  * 2. **On Windows the path is not negotiable at all.** The app returns
  *    `join(LOCALAPPDATA, 'Claude-3p')` unconditionally, so `--user-data-dir`
  *    cannot move it. `%APPDATA%\Claude-3p` is the LEGACY location the app
@@ -89,6 +100,30 @@ function ensure3pSuffix(dir) {
   return dir.endsWith('-3p') ? dir : `${dir}-3p`;
 }
 
+/**
+ * Move a profile out of `Claude-3p`, where it hijacks the normal instance.
+ *
+ * Earlier versions of this installer put it there. Anyone who ran one has a
+ * setup where opening plain Claude silently turns it into the bridge, so the
+ * move is done for them rather than left as a note they will never read.
+ */
+function migrateLegacyProfile(target) {
+  if (process.platform === 'win32') return; // the path is fixed there; nothing to move
+  const legacy = path.join(path.dirname(target), 'Claude-3p');
+  if (legacy === target || !fs.existsSync(legacy)) return;
+  if (fs.existsSync(target)) {
+    warn(`An old bridge profile is still at ${legacy.replace(os.homedir(), '~')}.`);
+    info('It makes plain Claude open as the bridge. Delete it once you are happy here.');
+    return;
+  }
+  try {
+    fs.renameSync(legacy, target);
+    ok(`moved the bridge profile out of Claude-3p, where it was hijacking plain Claude`);
+  } catch (err) {
+    warn(`Could not move ${legacy}: ${err.message}`);
+  }
+}
+
 function platform() {
   const home = os.homedir();
   const env = (name) => process.env[name];
@@ -97,7 +132,7 @@ function platform() {
     return {
       name: 'macOS',
       profile: ensure3pSuffix(
-        env('CLAUDE_3P_PROFILE') || path.join(home, 'Library', 'Application Support', 'Claude-3p'),
+        env('CLAUDE_3P_PROFILE') || path.join(home, 'Library', 'Application Support', 'ClaudeCodex-3p'),
       ),
       appCandidates: [
         env('CLAUDE_APP'),
@@ -118,6 +153,9 @@ function platform() {
       // Not configurable: the app hardcodes LOCALAPPDATA\Claude-3p on Windows,
       // so honouring CLAUDE_3P_PROFILE here would write somewhere it never reads.
       profile: path.join(local, 'Claude-3p'),
+      // See `hijackWarning`: on Windows this is the only path the app will use,
+      // so the two instances cannot be separated the way they are elsewhere.
+      sharesPathWithMain: true,
       appCandidates: [
         env('CLAUDE_APP'),
         path.join(local, 'AnthropicClaude', 'claude.exe'),
@@ -135,7 +173,7 @@ function platform() {
   return {
     name: 'Linux',
     profile: ensure3pSuffix(
-      env('CLAUDE_3P_PROFILE') || path.join(env('XDG_CONFIG_HOME') || path.join(home, '.config'), 'Claude-3p'),
+      env('CLAUDE_3P_PROFILE') || path.join(env('XDG_CONFIG_HOME') || path.join(home, '.config'), 'ClaudeCodex-3p'),
     ),
     appCandidates: [env('CLAUDE_APP'), '/usr/bin/claude-desktop', '/opt/Claude/claude', '/usr/local/bin/claude-desktop'].filter(
       Boolean,
@@ -305,6 +343,8 @@ function stepProfile(gatewayUrl) {
   const token = bridgeJson(['status'])?.gateway?.token ?? readGatewayToken();
   if (!token) fail('Could not read the gateway token. Is the gateway running?');
 
+  migrateLegacyProfile(PLAT.profile);
+
   const dir = path.join(PLAT.profile, 'configLibrary');
   fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
 
@@ -359,6 +399,23 @@ function stepProfile(gatewayUrl) {
     `${JSON.stringify({ appliedId: id, entries: [{ id, name: 'Default' }] }, null, 2)}\n`,
     { mode: 0o600 },
   );
+
+  // "1p" here is a kill switch: it forces first-party even with a perfectly
+  // good gateway config, and it is what the app's own "switch back to
+  // Claude.ai" writes. Anyone who has hit the hijack has probably set it by
+  // hand to get their normal Claude back, so clear it rather than leave the
+  // bridge mysteriously inert.
+  const deployPath = path.join(PLAT.profile, 'claude_desktop_config.json');
+  let deploy = {};
+  try {
+    deploy = JSON.parse(fs.readFileSync(deployPath, 'utf8'));
+  } catch {
+    /* first run */
+  }
+  if (deploy.deploymentMode !== '3p') {
+    deploy.deploymentMode = '3p';
+    fs.writeFileSync(deployPath, `${JSON.stringify(deploy, null, 2)}\n`, { mode: 0o600 });
+  }
 
   ok(`profile written to ${PLAT.profile}`);
   info('Separate from your normal Claude — same app, different settings and sessions.');

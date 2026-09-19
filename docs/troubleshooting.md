@@ -287,3 +287,41 @@ models appear with their own tiers and Codex stops claiming the defaults —
 picking "Opus" then really is Opus. If your desktop config pins an explicit
 `inferenceModels` list, regenerate it from `GET /v1/models` afterwards so the
 new Claude rows are included.
+
+
+## Opening normal Claude opens the bridge instead
+
+The two instances stop being separate, and turning one off turns off the other.
+
+Claude Desktop decides where to read its deployment config with one line:
+
+```js
+function profileDir(){
+  const dir = app.getPath("userData");
+  return dir.endsWith("-3p") ? dir : `${dir}-3p`;   //  Claude  ->  Claude-3p
+}
+```
+
+Both `deploymentMode` and `configLibrary/` are read from whatever that returns. So a
+bridge profile at `Claude-3p` is *exactly* where the normal instance — whose userData is
+`Claude` — goes looking. It finds the gateway config there, adopts it, and relocates
+itself into the bridge profile. And since `deploymentMode` lives in that same shared
+directory, setting it to `"1p"` to get your normal Claude back also disables the bridge.
+There is no per-instance setting; that is why it ping-pongs.
+
+**The fix is the profile's name.** The bridge lives at `ClaudeCodex-3p`:
+
+| Instance | userData | reads config from | result |
+| --- | --- | --- | --- |
+| normal Claude | `…/Claude` | `…/Claude-3p` — absent | stays first-party |
+| the bridge | `…/ClaudeCodex-3p` | itself (already ends `-3p`) | gateway mode |
+
+`npm run claudecodex` moves an old `Claude-3p` profile across automatically and clears a
+`deploymentMode` left on `"1p"`. Verified by launching the real app against both shapes:
+a profile with no `-3p` sibling comes up on `https_claude.ai_0` (first-party), and one
+named `…-3p` with a gateway config comes up on `app_localhost_0` (third-party).
+
+**Windows is different and cannot be separated this way.** There the app returns
+`join(LOCALAPPDATA, "Claude-3p")` unconditionally, ignoring `--user-data-dir` for this
+purpose, so both instances always read the same directory. Run the bridge or normal
+Claude, not both.

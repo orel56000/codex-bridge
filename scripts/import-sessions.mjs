@@ -51,7 +51,9 @@ const SUPPORT =
       : process.env['XDG_CONFIG_HOME'] || path.join(os.homedir(), '.config');
 
 const SRC_PROFILE = path.join(SUPPORT, 'Claude');
-const DST_PROFILE = path.join(SUPPORT, 'Claude-3p');
+// Not `Claude-3p`: a bridge profile there is where the NORMAL instance looks,
+// so it would adopt the gateway config and stop being a separate instance.
+const DST_PROFILE = path.join(SUPPORT, process.platform === 'win32' ? 'Claude-3p' : 'ClaudeCodex-3p');
 const SESSIONS = 'claude-code-sessions';
 
 /**
